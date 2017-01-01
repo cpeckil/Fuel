@@ -1,0 +1,102 @@
+---
+title: "Course Project: Prediction"
+author: "Chris Peck"
+date: "December 21, 2016"
+output: html_document
+---
+
+
+##Description
+The goal of this project is to create an algorithm to identify how well participants performed dumbbbell bicep curls.
+
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).  More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).  The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+
+##Load the data
+Load the training and test data sets
+```{r,echo=TRUE}
+filetrain<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+
+filetest<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+traindata <- read.csv(file=filetrain, header=TRUE, sep=",")
+testdata <- read.csv(file=filetest, header=TRUE, sep=",")
+
+```
+
+##Clean the data
+After viewing the data, it was evident that many fields contained blanks and NAs for the majority of the measurements (19,216 out of 19.622 observations).  These fields were eliminated from the data we use since they can't be used in the prediction algorithm and to help speed up the calculations on the data set.  We do not show the head(traindataclean) to conserve space in the report.
+```{r,echo=TRUE}
+##convert blanks to NA
+traindatana <- read.csv(file=filetrain, header=TRUE, sep=",",na.strings=c(""," ","NA"))
+na_count <-sapply(traindatana, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)
+##na_count
+
+##we see 19,216 NAs for many of the variables out of the 19,622 observations so we remove these columns to reduce the number of variables for our model fitting.  Statistics not shown to conserve space in the report.
+traindataclean<-traindatana[ , ! apply( traindatana , 2 , function(x) any(is.na(x)) ) ]
+
+##remove the first 7 columns which aren't part of the measurements taken by the monitor
+traindataclean<-traindataclean[,c(8:60)]
+
+##we can see there are no more variables that are blank or NA
+##head(traindataclean)
+```
+
+
+##Split the training data into a training set and a test set
+We split the training data into a training subset and a test subset so that we can do a cross-validation of the model prior to applying it to the 20 samples in the test data
+```{r,echo=TRUE}
+library(caret)
+trainIndex <- createDataPartition(traindataclean$classe, p=0.7, list=FALSE)
+data_train_train_subset <- traindataclean[ trainIndex,]
+data_train_test_subset <- traindataclean[-trainIndex,]
+```
+
+##Create various models for prediction
+
+#rpart
+Try rpart model for prediction
+```{r,echo=TRUE}
+install.packages("rattle")
+library(rattle)
+modelfittree<-train(classe~.,method="rpart", data=data_train_train_subset, control = rpart.control(maxdepth = 5))
+print(modelfittree$finalModel)
+
+fancyRpartPlot(modelfittree$finalModel)
+```
+
+Try predicting with the rpart model.  We can see it doesn't work very well based on the table, which contains many misclassifications in the predtree variable compared to the actual classe.
+```{r,echo=TRUE}
+predtree<-predict(modelfittree,data_train_test_subset)
+table(predtree,data_train_test_subset$classe)
+```
+
+# Random Forest
+Try random forest model.  We can see that this works well based on the confusion matrix, which has very low class errors with fashion D having the greatest error rate of 1%.  The variable importance plot shows that the yaw belt, roll belt, magnet dumbbell z and pitch belt are the most important variables in predicting the classe.
+```{r,echo=TRUE}
+library(randomForest)
+modelfitrf <- randomForest(classe ~ ., data=data_train_train_subset, importance=TRUE)
+modelfitrf
+varImpPlot(modelfitrf)
+```
+
+Try predicting with the random forest on the training test data.  We can see it works well as there are very few predictions that don't match the actual classe.  
+```{r,echo=TRUE}
+predrf<-predict(modelfitrf,data_train_test_subset)
+predtab<-table(predrf,data_train_test_subset$classe)
+confusionMatrix(predtab)
+```
+
+##Expected out of sample error
+From the confusion matrix above, we can see that the out of sample error of 0.5% is very low based on the accuracy of 99.5%.  Out of sample error is calculated as 1 - accuracy.
+
+## Conclusion
+I chose the random forest model because it works very well in predicting using the test portion of the training data set and runs quickly enough in R.
+
+##Course Project Prediction Quiz Portion: Predict on the test data using Random Forest Model
+We apply the random forest model to predict the classe of the 20 test observations for the quiz poriton of the project.
+```{r,echo=TRUE}
+predrftest<-predict(modelfitrf,testdata)
+predrftest
+table(predrftest)
+```
