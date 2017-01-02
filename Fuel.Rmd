@@ -47,6 +47,7 @@ traindataclean<-traindataclean[,c(8:60)]
 We split the training data into a training subset and a test subset so that we can do a cross-validation of the model prior to applying it to the 20 samples in the test data
 ```{r,echo=TRUE}
 library(caret)
+set.seed(1234)
 trainIndex <- createDataPartition(traindataclean$classe, p=0.7, list=FALSE)
 data_train_train_subset <- traindataclean[ trainIndex,]
 data_train_test_subset <- traindataclean[-trainIndex,]
@@ -54,25 +55,24 @@ data_train_test_subset <- traindataclean[-trainIndex,]
 
 ##Create various models for prediction
 
-#rpart
+###rpart
 Try rpart model for prediction
 ```{r,echo=TRUE}
 install.packages("rattle")
 library(rattle)
 modelfittree<-train(classe~.,method="rpart", data=data_train_train_subset, control = rpart.control(maxdepth = 5))
-print(modelfittree$finalModel)
 
 fancyRpartPlot(modelfittree$finalModel)
 ```
 
-Try predicting with the rpart model.  We can see it doesn't work very well based on the table, which contains many misclassifications in the predtree variable compared to the actual classe.
+Try predicting with the rpart model.  We can see it doesn't work very well based on the cross-validation table, which contains many misclassifications in the predtree variable compared to the actual classe.
 ```{r,echo=TRUE}
 predtree<-predict(modelfittree,data_train_test_subset)
 table(predtree,data_train_test_subset$classe)
 ```
 
-# Random Forest
-Try random forest model.  We can see that this works well based on the confusion matrix, which has very low class errors with fashion D having the greatest error rate of 1%.  The variable importance plot shows that the yaw belt, roll belt, magnet dumbbell z and pitch belt are the most important variables in predicting the classe.
+### Random Forest
+Try random forest model.  We can see that this works well based on the confusion matrix, which has very low class errors with fashion D having the greatest error rate of 1.3%.  The variable importance plot shows that the yaw belt, roll belt, magnet dumbbell z, magnet dumbbell y and pitch belt are the most important variables in predicting the classe.
 ```{r,echo=TRUE}
 library(randomForest)
 modelfitrf <- randomForest(classe ~ ., data=data_train_train_subset, importance=TRUE)
@@ -80,7 +80,7 @@ modelfitrf
 varImpPlot(modelfitrf)
 ```
 
-Try predicting with the random forest on the training test data.  We can see it works well as there are very few predictions that don't match the actual classe.  
+Try predicting with the random forest on the training test data.  We can see it works well as there are very few predictions that don't match the actual classe in the confusion matrix.  
 ```{r,echo=TRUE}
 predrf<-predict(modelfitrf,data_train_test_subset)
 predtab<-table(predrf,data_train_test_subset$classe)
@@ -88,15 +88,14 @@ confusionMatrix(predtab)
 ```
 
 ##Expected out of sample error
-From the confusion matrix above, we can see that the out of sample error of 0.5% is very low based on the accuracy of 99.5%.  Out of sample error is calculated as 1 - accuracy.
+From the confusion matrix above, we can see that the out of sample error of 0.3% is very low based on the accuracy of 99.7%.  Out of sample error is calculated as 1 - accuracy.
 
 ## Conclusion
-I chose the random forest model because it works very well in predicting using the test portion of the training data set and runs quickly enough in R.
+I chose the random forest model because it produces a high level of accuracy, works very well in predicting using the test portion of the training data set (as seen from confusion matrix) and runs quickly enough in R.
 
 ##Course Project Prediction Quiz Portion: Predict on the test data using Random Forest Model
 We apply the random forest model to predict the classe of the 20 test observations for the quiz poriton of the project.
 ```{r,echo=TRUE}
 predrftest<-predict(modelfitrf,testdata)
 predrftest
-table(predrftest)
 ```
